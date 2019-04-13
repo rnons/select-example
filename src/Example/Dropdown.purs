@@ -18,14 +18,14 @@ type Query = Const Void
 
 data Action
   = OnInput String
-  | HandleDropdown (Select.Message Action)
+  | HandleDropdown (Select.Message ExtraMessage)
 
 type State =
   { value :: String
   }
 
 type Slots =
-  ( dropdown :: Select.Slot Query () Action Unit
+  ( dropdown :: Select.Slot Query () ExtraMessage Unit
   )
 
 _dropdown = SProxy :: SProxy "dropdown"
@@ -48,13 +48,15 @@ renderSelect state st =
   , guard (st.visibility == Select.On) $> HH.div_
     [ HH.input
       [ HP.value state.value
-      -- , HE.onValueInput $ Just <<< \v -> Select.raise $ OnInput v
+      , HE.onValueInput $ Just <<< Select.Action <<< OnInput
       ]
     , HH.div_
       [ HH.text $ "You typed: " <> state.value
       ]
     ]
   ]
+
+data ExtraMessage = Emit Action
 
 render :: State -> HTML
 render state =
@@ -63,8 +65,10 @@ render state =
       $ Just <<< HandleDropdown
   ]
   where
+  spec :: Select.Spec () Query Action () ExtraMessage Aff
   spec = Select.defaultSpec
     { render = renderSelect state
+    , handleAction = H.raise <<< Select.Message <<< Emit
     }
   input =
     { inputType: Select.Toggle
@@ -87,5 +91,5 @@ handleAction (OnInput value) = do
   H.modify_ $ _ { value = value }
 handleAction (HandleDropdown msg) = do
   case msg of
-    Select.Message q -> handleAction q
+    Select.Message (Emit q) -> handleAction q
     _ -> pure unit
